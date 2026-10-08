@@ -66,7 +66,9 @@ function cdv(dvs){
  return{max:Math.max(0,best),rows};}
 function rate(p){for(const[t,n]of[[85,"最佳"],[70,"很好"],[55,"好"],[40,"尚可"],[25,"差"],[10,"很差"]])if(p>=t)return n;return"不合格"}
 let S=[],cur=0;
-function newS(){return{area:300,add:false,q:{}}}
+function newS(){return{name:"",area:300,add:false,q:{}}}
+const nm=i=>S[i].name.trim()||`樣本 ${i+1}`;
+function setName(v){S[cur].name=v;document.querySelectorAll(".tab")[cur].textContent=nm(cur)+(S[cur].add?"*":"")}
 function addS(){S.push(newS());cur=S.length-1;render()}
 function delS(){if(S.length>1){S.splice(cur,1);cur=Math.max(0,cur-1);render()}}
 function setQ(i,l,v){S[cur].q[i+l]=parseFloat(v)||0;calcAll()}
@@ -75,8 +77,8 @@ function pci(s){const rows=[],dvs=[];
   if(q>0&&s.area>0){const x=q/s.area*100,d=dv(i,l,x);rows.push({i,l,q,x,d});dvs.push(d)}}
  const r=cdv(dvs);return{p:100-r.max,rows,steps:r.rows}}
 function render(){
- document.getElementById("tabs").innerHTML=S.map((s,i)=>`<button class="tab ${i==cur?"on":""}" onclick="cur=${i};render()">樣本 ${i+1}${s.add?"*":""}</button>`).join("");
- const s=S[cur];let h=`<div class="row"><label>樣本面積 (m²)：<input type="number" min="0" value="${s.area}" oninput="S[cur].area=parseFloat(this.value)||0;calcAll()" style="width:100px"></label>
+ document.getElementById("tabs").innerHTML=S.map((s,i)=>`<button class="tab ${i==cur?"on":""}" onclick="cur=${i};render()">${nm(i)}${s.add?"*":""}</button>`).join("");
+ const s=S[cur];let h=`<div class="row"><label>樣本名稱：<input type="text" maxlength="20" value="${s.name.replace(/"/g,"&quot;")}" placeholder="樣本 ${cur+1}" oninput="setName(this.value)" style="width:150px"></label><label>樣本面積 (m²)：<input type="number" min="0" value="${s.area}" oninput="S[cur].area=parseFloat(this.value)||0;calcAll()" style="width:100px"></label>
  <label><input type="checkbox" ${s.add?"checked":""} onchange="S[cur].add=this.checked;render()"> 增列樣本（非代表性）</label><button onclick="delS()">刪除此樣本</button></div>
  <div class="wrap"><table><tr><th>損壞類型</th><th>Low</th><th>Med</th><th>High</th></tr>`;
  for(let i=1;i<=13;i++){const f=l=>`<input type="number" min="0" step="any" value="${s.q[i+l]||""}" placeholder="0" oninput="setQ(${i},'${l}',this.value)">`;
@@ -99,13 +101,13 @@ function calcAll(){
 function exportXlsx(){
  if(typeof XLSX==="undefined"){alert("Excel 元件載入失敗，請確認網路連線後重新整理頁面");return}
  const lv={L:"輕",M:"中",H:"重",X:"-"},R=[],A=[],sum=[["樣本","類型","面積(m²)","PCI","等級"]],sheets=[];
- S.forEach((x,i)=>{const r=pci(x);sum.push([`樣本 ${i+1}`,x.add?"增列":"隨機",x.area,+r.p.toFixed(1),rate(r.p)]);
+ S.forEach((x,i)=>{const r=pci(x);sum.push([nm(i),x.add?"增列":"隨機",x.area,+r.p.toFixed(1),rate(r.p)]);
   if(x.area>0)(x.add?A:R).push({p:r.p,a:x.area});
   const d=[["損壞類型","等級","數量","單位","密度(%)","DV"]];
   r.rows.forEach(a=>d.push([`${a.i}. ${NAMES[a.i-1]}`,lv[a.l],a.q,U(a.i),+a.x.toFixed(3),+a.d.toFixed(1)]));
   d.push([],["修正輪次","折減值","Total","q","CDV"]);
   r.steps.forEach((a,n)=>d.push([n+1,a.l.map(v=>v.toFixed(1)).join(", "),+a.t.toFixed(1),a.q,+a.c.toFixed(1)]));
-  d.push([],["樣本 PCI",+r.p.toFixed(1),rate(r.p)]);sheets.push([`樣本${i+1}`,d])});
+  d.push([],["樣本 PCI",+r.p.toFixed(1),rate(r.p)]);let sn=nm(i).replace(/[:\\\/?*\[\]]/g,"_").slice(0,28)||`樣本${i+1}`;while(sheets.some(z=>z[0]===sn))sn=sn.slice(0,26)+"_"+(i+1);sheets.push([sn,d])});
  if(R.length){const w=u=>u.reduce((a,b)=>a+b.p*b.a,0)/u.reduce((a,b)=>a+b.a,0);let f=w(R);
   if(A.length){const sa=A.reduce((a,b)=>a+b.a,0),T=parseFloat(document.getElementById("secA").value)||(R.reduce((a,b)=>a+b.a,0)+sa);f=(f*(T-sa)+w(A)*sa)/T}
   sum.push([],["路段 PCI",+f.toFixed(1),rate(f)])}
